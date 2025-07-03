@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ReadSpyn"
+version = "0.0.1"
+authors = [
+  { name="Jan A. Krzywda", email="j.a.krzywda@liacs.leidenuniv.nl" },
+]
+description = "A simulator for a readout system."
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    # list your project's dependencies here, e.g.:
+    # "numpy>=1.20.0",
+    # "matplotlib",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/jan-a-krzywda/ReadSpyn"
+"Bug Tracker" = "https://github.com/jan-a-krzywda/ReadSpyn/issues"
