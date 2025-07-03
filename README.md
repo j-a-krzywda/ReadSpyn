@@ -1,0 +1,2 @@
+# ReadSpyn
+Spin-readout simulator
