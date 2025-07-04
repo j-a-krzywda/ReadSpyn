@@ -1,6 +1,6 @@
 # Readout Simulator
 
-<img src="icon.png" alt="ReadSpyn Icon" width="100" />
+<img src="icon.png" alt="ReadSpyn Icon" width="250" />
 
 A brief description of your project.
 
