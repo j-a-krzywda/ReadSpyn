@@ -1,6 +1,11 @@
 # Readout Simulator
 
+![icon](https://github.com/user-attachments/assets/263256fd-58ab-451a-b48b-11aeb114c776)
+
+
 A brief description of your project.
+
+Link to the Overleaf document: https://www.overleaf.com/4595747995vjmghjrhsrhh#09deae
 
 ## Installation
 
