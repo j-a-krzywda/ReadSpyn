@@ -1,7 +1,6 @@
 # Readout Simulator
 
-![icon](https://github.com/user-attachments/assets/263256fd-58ab-451a-b48b-11aeb114c776)
-
+<img src="icon.png" alt="ReadSpyn Icon" width="100" />
 
 A brief description of your project.
 
