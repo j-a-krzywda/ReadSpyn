@@ -5,7 +5,7 @@ from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
 from scipy.signal import hilbert
 from numba import njit
-from .quantum_dot_system import QuantumDotSystem
+from quantum_dot_system import QuantumDotSystem
 
 @njit
 def conductance_fun_numba(eps, w0, R0_val):
@@ -16,7 +16,6 @@ def rlc_ode_system_numba(t, y, Lc, Cp, RL_eff, Rc, eps_interp_val, V_s_source_va
     v_Cp, i_L = y
     G_s_t = conductance_fun_numba(eps_interp_val, eps_w, R0)
     
-    # Using conductance directly to avoid division by zero
     v_A = (1 / (1 + Rc * G_s_t)) * (Rc * i_L + v_Cp) if np.abs(1 + Rc * G_s_t) > 1e-9 else 0
     dv_Cp_dt = G_s_t * (v_A - v_Cp)
     
@@ -28,7 +27,7 @@ class Resonator:
     """Represents a resonator sensor with an RLC circuit."""
     def __init__(self, Lc: float = 800e-9, Cp: float = 0.6e-12, RL: float = 40, 
                  Rc: float = 100e6, Z0: float = 50.0, R0: float = 50e3, 
-                 eps_w: float = 500e-6, self_capacitance: float = 1e-15):
+                 eps_w: float = 500e-6, self_capacitance: float = 1e-10):
         self.Lc, self.Cp, self.RL, self.Rc, self.Z0, self.R0, self.eps_w = Lc, Cp, RL, Rc, Z0, R0, eps_w
         self.self_capacitance = self_capacitance
         self.omega0 = 1 / np.sqrt(self.Lc * self.Cp)
@@ -41,8 +40,9 @@ class Resonator:
         """
         Simulates the IQ signal for a given charge state and noise trajectory.
         """
+        eps0 = params.get('eps0', 0.0) * self.eps_w
         sensor_voltages = np.zeros(dot_system.Cds.shape[1])
-        energy_offset = dot_system.get_energy_offset(charge_state, sensor_voltages)[sensor_index]
+        energy_offset = dot_system.get_energy_offset(charge_state, sensor_voltages, eps0)[sensor_index]
         
         SNR_white = params.get('SNR_white', 1.0)
         SNR_eff = params.get('SNR_eff', SNR_white)

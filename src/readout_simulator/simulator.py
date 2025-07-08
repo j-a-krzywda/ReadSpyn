@@ -2,9 +2,9 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-from .sensor import Resonator
-from .noise_models import OverFNoise
-from .quantum_dot_system import QuantumDotSystem
+from sensor import Resonator
+from noise_models import OverFNoise
+from quantum_dot_system import QuantumDotSystem
 
 class ReadoutSimulator:
     """
@@ -40,34 +40,46 @@ class ReadoutSimulator:
             times = np.arange(0, t_end * sensor.T0, dt)
             num_points = len(times)
             
-            # Calculate a more physically meaningful SNR
             def conductance_fun(eps):
                 return 2 * np.cosh(2 * eps / sensor.eps_w)**(-2) / sensor.R0
             
-            energy_offsets = [sensor.get_energy_offset(cs, np.zeros(self.dot_system.num_sensors))[sensor_index] for cs in charge_states]
+            eps0 = params.get('eps0', 0.0) * sensor.eps_w
+            energy_offsets = [self.dot_system.get_energy_offset(cs, np.zeros(self.dot_system.num_sensors), eps0)[sensor_index] for cs in charge_states]
             g_values = [conductance_fun(eo) for eo in energy_offsets]
-            
             params['SNR_eff'] = params['SNR_white'] * np.abs(g_values[0] - g_values[1]) / np.mean(g_values)
-            
+            unique_states = np.unique(charge_states, axis=0)
+
+            plot_conductance = False
+            if plot_conductance:
+                plt.figure()
+                epses = sensor.eps_w * np.linspace(0, 2, 51)
+                plt.plot(epses, conductance_fun(epses), label='Conductance')
+                plt.vlines(x=eps0, ymin=0, ymax=conductance_fun(eps0), label='SNR Adjusted Conductance', linestyle='--')
+                plt.vlines(x=np.array(energy_offsets[0]), ymin=0, ymax=conductance_fun(eps0), label='SNR Adjusted Conductance', linestyle='--', color='green')
+                plt.vlines(x=np.array(energy_offsets[1]), ymin=0, ymax=conductance_fun(eps0), label='SNR Adjusted Conductance', linestyle='--', color="r")
+                plt.figure()
+
             for i, charge_state in enumerate(charge_states):
                 noise_trajectory = self.noise_model.generate_trajectory(num_points)
                 I, Q = sensor.get_iq_signal(times, self.dot_system, charge_state, sensor_index, params, noise_trajectory)
                 self.results.append({
                     'sensor_index': sensor_index,
-                    'charge_state_id': i,
+                    'charge_state_id': np.where(np.all(unique_states == charge_state, axis=1))[0][0],
                     'I': I, 'Q': Q,
                     'times': times
                 })
 
     def plot_results(self):
         """Plots the integrated IQ results for each sensor."""
+        colors = ["r","g","b"]
         for sensor_index in range(len(self.sensors)):
             fig, ax = plt.subplots(figsize=(8, 8))
             for result in self.results:
                 if result['sensor_index'] == sensor_index:
                     I_int = np.cumsum(result['I']) / np.arange(1, len(result['I']) + 1)
                     Q_int = np.cumsum(result['Q']) / np.arange(1, len(result['Q']) + 1)
-                    color = 'blue' if result['charge_state_id'] == 0 else 'red'
+                    color = colors[result['charge_state_id'] ]
+                    
                     ax.scatter(I_int[-1], Q_int[-1], c=color, label=f"Charge State {result['charge_state_id']}")
             
             ax.set_xlabel("Integrated I")

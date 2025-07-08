@@ -1,7 +1,7 @@
 # src/readout_simulator/modules/noise_models.py
-
 import numpy as np
-from readout_simulator.modules.noise import Over_f_noise
+# Assuming the original noise.py is available in the same directory
+from noise import Over_f_noise
 
 
 class OverFNoise:
