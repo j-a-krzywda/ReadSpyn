@@ -33,7 +33,7 @@ Contributions are welcome! Please open an issue or submit a pull request.
 ## Todo
 
 ### High priority
-- [ ] Make the code work
+- [x] Make the code work
 - [ ] Fluctuations of Capacitance, w = 1/sqrt{L0 C0} (chat w Miguel -> parameters of C noise) (rotations in IQ)
 - [x] Noise in R (drift, displacements in IQ spaces)
 
