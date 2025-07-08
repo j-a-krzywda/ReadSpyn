@@ -1,6 +1,10 @@
 # Readout Simulator
 
+<img src="icon.png" alt="ReadSpyn Icon" width="250" />
+
 A brief description of your project.
+
+Link to the Overleaf document: https://www.overleaf.com/4595747995vjmghjrhsrhh#09deae
 
 ## Installation
 
