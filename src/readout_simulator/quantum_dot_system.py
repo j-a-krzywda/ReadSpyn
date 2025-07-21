@@ -17,6 +17,8 @@ class QuantumDotSystem:
         self.num_sensors = Cds.shape[1]
         self.Cdd_inv = np.linalg.inv(Cdd)
         self.Cds = Cds
+        print(f"$\Delta \epsilon/\epsilon_w$", Cds.T @ self.Cdd_inv)
+
 
     @classmethod
     def from_random(cls, num_dots: int, num_sensors: int, Css: float = 1e-15):

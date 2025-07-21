@@ -20,3 +20,16 @@ class OverFNoise:
     def generate_trajectory(self, num_points: int) -> np.ndarray:
         """Generates a noise trajectory of a given length."""
         return np.array([self.noise_generator.update(self.dt) for _ in range(num_points)])
+    
+
+class OU_noise():
+    def __init__(self, sigma: float, gamma: float):
+        self.sigma = sigma
+        self.gamma = gamma
+        self.dt = 1e-3  # Time step
+        self.current_value = 0.0
+
+    def update(self):
+        """Updates the noise value using the Ornstein-Uhlenbeck process."""
+        self.current_value += -self.gamma * self.current_value * self.dt + self.sigma * np.sqrt(self.dt) * np.random.normal()
+        return self.current_value
