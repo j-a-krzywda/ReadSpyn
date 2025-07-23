@@ -29,7 +29,7 @@ class ReadoutSimulator:
 
         # LOOP OVER SENSORS-----------
         for sensor_index, sensor in enumerate(self.sensors):
-            dt = sensor.T0 / 5
+            dt = 0.5*1e-9
             times = np.arange(0, t_end * sensor.T0, dt)
             num_points = len(times)
             

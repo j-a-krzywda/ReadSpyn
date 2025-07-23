@@ -113,7 +113,7 @@ class RLC_sensor:
             
             return rlc_ode_system_numba(t, y, self.Lc, C_noisy, RL_effective, self.Rc, eps_val, v_s_val, self.eps_w, self.R0)
 
-        sol = solve_ivp(ode_wrapper, [0, t_end], y0, t_eval=times, method='Radau', rtol=1e-4, atol=1e-7)
+        sol = solve_ivp(ode_wrapper, [0, t_end], y0, t_eval=times, method='Radau', rtol=1e-3, atol=1e-4)
 
         i_L_sim = sol.y[1, :]
         V_s_t = v_s_source_func(sol.t)
