@@ -1,3 +1,48 @@
+Metadata-Version: 2.4
+Name: ReadSpyn
+Version: 0.1.0
+Summary: A comprehensive simulator for quantum dot readout systems with realistic noise models, RLC resonator sensors, and optional JAX acceleration for GPU/vectorized simulations.
+Author-email: "Jan A. Krzywda" <j.a.krzywda@liacs.leidenuniv.nl>
+License: MIT
+Project-URL: Homepage, https://github.com/jan-a-krzywda/ReadSpyn
+Project-URL: Bug Tracker, https://github.com/jan-a-krzywda/ReadSpyn/issues
+Project-URL: Documentation, https://readspyn.readthedocs.io/
+Project-URL: Source Code, https://github.com/jan-a-krzywda/ReadSpyn
+Keywords: quantum,quantum-dots,readout,simulation,noise,RLC,resonator,jax,gpu,acceleration
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Science/Research
+Classifier: Topic :: Scientific/Engineering :: Physics
+Classifier: Topic :: Scientific/Engineering :: Electronic Design Automation
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENCE
+Requires-Dist: numpy>=1.20.0
+Requires-Dist: scipy>=1.7.0
+Requires-Dist: matplotlib>=3.3.0
+Requires-Dist: tqdm>=4.60.0
+Requires-Dist: numba>=0.56.0
+Provides-Extra: dev
+Requires-Dist: pytest>=6.0; extra == "dev"
+Requires-Dist: pytest-cov>=2.0; extra == "dev"
+Requires-Dist: black>=21.0; extra == "dev"
+Requires-Dist: flake8>=3.8; extra == "dev"
+Requires-Dist: mypy>=0.800; extra == "dev"
+Provides-Extra: docs
+Requires-Dist: sphinx>=4.0; extra == "docs"
+Requires-Dist: sphinx-rtd-theme>=0.5; extra == "docs"
+Requires-Dist: nbsphinx>=0.8; extra == "docs"
+Provides-Extra: jax
+Requires-Dist: jax>=0.4.0; extra == "jax"
+Requires-Dist: jaxlib>=0.4.0; extra == "jax"
+Dynamic: license-file
+
 # ReadSpyn: Quantum Dot Readout Simulator
 
 <img src="icon.png" alt="ReadSpyn Icon" width="250" />

@@ -1,19 +1,59 @@
+"""
+RLC Sensor Backend Module
+
+This module provides the RLC_sensor class for simulating resonator-based sensors
+used in quantum dot readout systems.
+"""
 
 import numpy as np
 from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
 from scipy.signal import hilbert
 from numba import njit
-from quantum_dot_system import QuantumDotSystem
-from noise import OU_noise
+from typing import Dict, Any, Optional
 
-# Numba-jitted functions remain the same
+from .quantum_dot_system import QuantumDotSystem
+from .noise import OU_noise
+
+
 @njit
-def conductance_fun_numba(eps, w0, R0_val):
+def conductance_fun_numba(eps: float, w0: float, R0_val: float) -> float:
+    """
+    Calculate conductance using a Numba-optimized function.
+    
+    Args:
+        eps: Energy offset
+        w0: Energy width
+        R0_val: Base resistance
+        
+    Returns:
+        float: Conductance value
+    """
     return 2 * np.cosh(2 * eps / w0)**(-2) / R0_val
 
+
 @njit
-def rlc_ode_system_numba(t, y, Lc, Cp_t, RL_eff, Rc, eps_val, V_s_val, w0, R0):
+def rlc_ode_system_numba(t: float, y: np.ndarray, Lc: float, Cp_t: float, 
+                         RL_eff: float, Rc: float, eps_val: float, 
+                         V_s_val: float, w0: float, R0: float) -> np.ndarray:
+    """
+    Numba-optimized RLC circuit ODE system.
+    
+    Args:
+        t: Time
+        y: State vector [v_Cp, i_L]
+        Lc: Inductance
+        Cp_t: Capacitance (can be time-dependent)
+        RL_eff: Effective resistance
+        Rc: Coupling resistance
+        eps_val: Energy offset
+        V_s_val: Source voltage
+        w0: Energy width
+        R0: Base resistance
+        
+    Returns:
+        np.ndarray: Derivatives [dv_Cp_dt, di_L_dt]
+    """
     v_Cp, i_L = y
     G_s_t = conductance_fun_numba(eps_val, w0, R0)
 
@@ -23,18 +63,56 @@ def rlc_ode_system_numba(t, y, Lc, Cp_t, RL_eff, Rc, eps_val, V_s_val, w0, R0):
     else:
         v_A = (1 / (1 + Rc * G_s_t)) * (Rc * i_L + v_Cp)
         dv_Cp_dt = (v_A - v_Cp) / (Rc * Cp_t)
+    
     di_L_dt = (V_s_val - RL_eff * i_L - v_A) / Lc
     
     return np.array([dv_Cp_dt, di_L_dt])
 
+
 class RLC_sensor:
-    """Represents a resonator sensor with an RLC circuit."""
-    def __init__(self, params_resonator: dict, params_coulomb_peak: dict,
-                 c_noise_model: OU_noise = None, eps_noise_model: OU_noise = None):
+    """
+    Represents a resonator sensor with an RLC circuit.
+    
+    This class simulates the behavior of an RLC resonator used for quantum dot
+    readout, including noise effects and signal processing.
+    
+    Attributes:
+        Lc (float): Inductance of the resonator (H)
+        Cp (float): Parasitic capacitance (F)
+        RL (float): Load resistance (Ω)
+        Rc (float): Coupling resistance (Ω)
+        Z0 (float): Characteristic impedance (Ω)
+        R0 (float): Base resistance for conductance (Ω)
+        eps_w (float): Energy width (eV)
+        eps0 (float): Operating point energy offset (eV)
+        omega0 (float): Resonant angular frequency (rad/s)
+        f0 (float): Resonant frequency (Hz)
+        T0 (float): Resonant period (s)
+    """
+    
+    def __init__(self, params_resonator: Dict[str, float], 
+                 params_coulomb_peak: Dict[str, float],
+                 c_noise_model: Optional[OU_noise] = None, 
+                 eps_noise_model: Optional[OU_noise] = None):
         """
-        Initialize the RLC_sensor with parameter dictionaries.
+        Initialize the RLC sensor.
+        
+        Args:
+            params_resonator: Dictionary containing resonator parameters
+                - Lc: Inductance (H)
+                - Cp: Parasitic capacitance (F)
+                - RL: Load resistance (Ω)
+                - Rc: Coupling resistance (Ω)
+                - Z0: Characteristic impedance (Ω)
+                - self_capacitance: Additional self-capacitance (F)
+            params_coulomb_peak: Dictionary containing Coulomb peak parameters
+                - g0: Maximum conductance (S)
+                - eps0: Operating point (relative to eps_width)
+                - eps_width: Energy width (eV)
+            c_noise_model: Capacitance noise model
+            eps_noise_model: Energy offset noise model
         """
-        # Extract resonator parameters
+        # Extract resonator parameters with defaults
         self.Lc = params_resonator.get('Lc', 800e-9)
         self.Cp = params_resonator.get('Cp', 0.6e-12)
         self.RL = params_resonator.get('RL', 40)
@@ -53,33 +131,59 @@ class RLC_sensor:
         self.f0 = self.omega0 / (2 * np.pi)
         self.T0 = 1 / self.f0
 
+        # Noise models
         self.C_noise_model = c_noise_model
         self.eps_noise_model = eps_noise_model
 
+        # Print initialization summary
+        self._print_initialization_summary()
+
+    def _print_initialization_summary(self):
+        """Print a summary of the sensor initialization."""
         print(f"[RLC_sensor] Initialized with:")
-        print(f"  Lc = {self.Lc} H")
-        print(f"  Cp = {self.Cp} F")
-        print(f"  Self-capacitance = {self.self_capacitance} F")
-        print(f"  Total capacitance (C_total) = {self.C_total} F")
+        print(f"  Lc = {self.Lc:.3e} H")
+        print(f"  Cp = {self.Cp:.3e} F")
+        print(f"  Self-capacitance = {self.self_capacitance:.3e} F")
+        print(f"  Total capacitance = {self.C_total:.3e} F")
         print(f"  RL = {self.RL} Ω")
-        print(f"  Rc = {self.Rc} Ω")
+        print(f"  Rc = {self.Rc:.3e} Ω")
         print(f"  Z0 = {self.Z0} Ω")
-        print(f"  R0 = {self.R0} Ω")
-        print(f"  g0 = {1/self.R0} S")
-        print(f"  eps_w = {self.eps_w} eV")
-        print(f"  Resonant frequency (f0) = {self.f0:.3e} Hz")
-        print(f"  Resonant period (T0) = {self.T0:.3e} s")
+        print(f"  R0 = {self.R0:.3e} Ω")
+        print(f"  g0 = {1/self.R0:.3e} S")
+        print(f"  eps_w = {self.eps_w:.3e} eV")
+        print(f"  Resonant frequency = {self.f0:.3e} Hz")
+        print(f"  Resonant period = {self.T0:.3e} s")
+        
         if self.C_noise_model:
             print(f"  Capacitance noise model: {type(self.C_noise_model).__name__}")
         else:
-            print("  Capacitance noise model: None") #NOTE: what is R0
-        
+            print("  Capacitance noise model: None")
+            
+        if self.eps_noise_model:
+            print(f"  Energy noise model: {type(self.eps_noise_model).__name__}")
+        else:
+            print("  Energy noise model: None")
 
     def get_signal(self, times: np.ndarray, dot_system: QuantumDotSystem,
-                   charge_state: np.ndarray, sensor_index: int, params: dict,
-                   noise_trajectory: np.ndarray = None):
+                   charge_state: np.ndarray, sensor_index: int, params: Dict[str, Any],
+                   noise_trajectory: Optional[np.ndarray] = None) -> tuple:
         """
-        Simulates the IQ signal for a given charge state and noise trajectory.
+        Simulate the IQ signal for a given charge state and noise trajectory.
+        
+        Args:
+            times: Time array for simulation
+            dot_system: Quantum dot system
+            charge_state: Charge state vector
+            sensor_index: Index of this sensor
+            params: Simulation parameters
+            noise_trajectory: Optional noise trajectory
+            
+        Returns:
+            tuple: (I, Q, V_refl_t, times)
+                - I: In-phase component
+                - Q: Quadrature component  
+                - V_refl_t: Raw reflected voltage
+                - times: Time array
         """
         eps0 = params.get('eps0', 0.0) * self.eps_w
         sensor_voltages = np.zeros(dot_system.Cds.shape[1])
@@ -89,38 +193,54 @@ class RLC_sensor:
         SNR_eff = params.get('SNR_eff', SNR_white)
         t_end = times[-1]
         
+        # Apply noise trajectory if provided
         eps_values = (noise_trajectory if noise_trajectory is not None else 0) + energy_offset
 
-        eps_interpolator = interp1d(times, eps_values, kind='cubic', fill_value="extrapolate", bounds_error=False)
+        # Create interpolator for energy values
+        eps_interpolator = interp1d(times, eps_values, kind='cubic', 
+                                   fill_value="extrapolate", bounds_error=False)
         
-        y0, RL_effective = [0.0, 0.0], self.RL + self.Z0
+        # Initial conditions and effective resistance
+        y0 = [0.0, 0.0]  # [v_Cp, i_L]
+        RL_effective = self.RL + self.Z0
         
         def v_s_source_func(t):
+            """Source voltage function."""
             return 1.0 * np.sin(self.omega0 * t)
 
+        # Generate capacitance noise if model is provided
         C_noise = np.zeros_like(times)
         if self.C_noise_model:
             for i in range(len(times)):
-                C_noise[i] = self.C_noise_model.update(times[i] - (times[i-1] if i > 0 else 0))
+                dt = times[i] - (times[i-1] if i > 0 else 0)
+                C_noise[i] = self.C_noise_model.update(dt)
 
         def ode_wrapper(t, y):
+            """Wrapper for the ODE system."""
             eps_val = eps_interpolator(t)
             v_s_val = v_s_source_func(t)
             
-            # --- CORRECTED ---
-            # The noisy capacitance is now the total capacitance plus the noise term.
+            # Get noisy capacitance
             C_noisy = self.C_total + C_noise[np.argmin(np.abs(times - t))]
             
-            return rlc_ode_system_numba(t, y, self.Lc, C_noisy, RL_effective, self.Rc, eps_val, v_s_val, self.eps_w, self.R0)
+            return rlc_ode_system_numba(t, y, self.Lc, C_noisy, RL_effective, 
+                                       self.Rc, eps_val, v_s_val, self.eps_w, self.R0)
 
-        sol = solve_ivp(ode_wrapper, [0, t_end], y0, t_eval=times, method='Radau', rtol=1e-3, atol=1e-4)
+        # Solve ODE system
+        sol = solve_ivp(ode_wrapper, [0, t_end], y0, t_eval=times, 
+                       method='Radau', rtol=1e-3, atol=1e-4)
 
+        # Extract current and calculate reflected voltage
         i_L_sim = sol.y[1, :]
         V_s_t = v_s_source_func(sol.t)
+        
+        # Add noise based on SNR
         amp = np.std(V_s_t) / np.sqrt(SNR_eff)
-        V_refl_t = V_s_t - self.Z0 * i_L_sim - (V_s_t / 2.0) + np.random.normal(0, 1, len(V_s_t)) * amp
+        V_refl_t = (V_s_t - self.Z0 * i_L_sim - (V_s_t / 2.0) + 
+                    np.random.normal(0, 1, len(V_s_t)) * amp)
+        
+        # Extract I and Q components using Hilbert transform
         V_refl_phasor = hilbert(V_refl_t) * np.exp(-1j * self.omega0 * sol.t)
-
         I = np.real(V_refl_phasor) 
         Q = np.imag(V_refl_phasor)
 

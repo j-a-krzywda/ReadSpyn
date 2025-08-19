@@ -2,3 +2,4 @@ src/readout_simulator/modules/__pycache__/*
 src/readout_simulator/modules/modules/__pycache__/*
 src/readout_simulator/__pycache__/*
 Readout_sim/__pycache__/*
+*.npy
