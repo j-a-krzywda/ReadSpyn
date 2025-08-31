@@ -2,18 +2,31 @@
 RLC Sensor Backend Module
 
 This module provides the RLC_sensor class for simulating resonator-based sensors
-used in quantum dot readout systems.
+used in quantum dot readout systems, with both NumPy and JAX implementations.
 """
 
 import numpy as np
+try:
+    import jax
+    import jax.numpy as jnp
+    JAX_AVAILABLE = True
+except ImportError:
+    JAX_AVAILABLE = False
+    # Create dummy jax and jnp for when JAX is not available
+    class DummyJAX:
+        def __getattr__(self, name):
+            raise ImportError("JAX is not available. Install JAX to use JAX features.")
+    jax = DummyJAX()
+    jnp = DummyJAX()
 from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
 from scipy.signal import hilbert
 from numba import njit
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
+from functools import partial
 
 from .quantum_dot_system import QuantumDotSystem
-from .noise import OU_noise
+from .noise_models import OU_noise
 
 
 @njit
@@ -340,3 +353,72 @@ class RLC_sensor:
         
 
         return I, Q, V_refl_t, times
+    
+    def get_signal_jax(self, times: jax.Array, dot_system: QuantumDotSystem,
+                      charge_state: jax.Array, sensor_index: int, params: Dict[str, Any],
+                      noise_trajectory: jax.Array, key: jax.random.PRNGKey) -> Tuple[jax.Array, jax.Array, jax.Array]:
+        """
+        JAX-compatible signal generation for a given charge state and noise trajectory.
+        
+        Args:
+            times: Time array for simulation
+            dot_system: Quantum dot system
+            charge_state: Charge state vector
+            sensor_index: Index of this sensor
+            params: Simulation parameters
+            noise_trajectory: Precomputed noise trajectory
+            
+        Returns:
+            Tuple[jax.Array, jax.Array, jax.Array]: (I, Q, V_refl_t)
+                - I: In-phase component
+                - Q: Quadrature component  
+                - V_refl_t: Raw reflected voltage
+        """
+        eps0 = params.get('eps0', 0.0) * self.eps_w
+        sensor_voltages = jnp.zeros(dot_system.Cds.shape[1])
+        energy_offset = dot_system.get_energy_offset(charge_state, sensor_voltages, eps0)[sensor_index]
+        
+        # Calculate effective SNR
+        SNR_white = params.get('SNR_white', 1.0)
+        SNR_eff = params.get('SNR_eff', SNR_white)
+        
+        # Apply noise trajectory
+        eps_values = noise_trajectory + energy_offset
+        
+        # Calculate conductance values
+        def conductance_fun(eps):
+            return jnp.cosh(eps / self.eps_w)**(-2) / self.R0
+        
+        conductances = jax.vmap(conductance_fun)(eps_values)
+        
+        # Generate source voltage
+        V_s_t = jnp.sin(self.omega0 * times)
+        
+        # Calculate reflected voltage (simplified model for JAX compatibility)
+        # This is a simplified version that avoids ODE solving for efficiency
+        V_refl_t = V_s_t * (1 - conductances / (conductances + self.Z0))
+        
+        # Add white noise based on SNR
+        # Use a deterministic key based on the noise trajectory to ensure different noise for different realizations
+        noise_key = jax.random.fold_in(key, jnp.sum(noise_trajectory).astype(jnp.int32))
+        noise_amplitude = jnp.sqrt(SNR_eff) * jnp.std(V_refl_t)
+        white_noise = jax.random.normal(noise_key, shape=V_refl_t.shape) * noise_amplitude
+        V_refl_t = V_refl_t + white_noise
+        
+        # Extract I and Q components using simplified demodulation
+        # For JAX compatibility, we use a simpler approach than Hilbert transform
+        I = V_refl_t * jnp.cos(self.omega0 * times)
+        Q = V_refl_t * jnp.sin(self.omega0 * times)
+        
+        # Apply low-pass filtering (simplified)
+        
+        def low_pass_filter(signal):
+            # Simple moving average as low-pass filter
+            window_size = min(10, len(signal) // 10)
+            kernel = jnp.ones(window_size) / window_size
+            return jnp.convolve(signal, kernel, mode='same')
+        
+        I = low_pass_filter(I)
+        Q = low_pass_filter(Q)
+        
+        return I, Q, V_refl_t

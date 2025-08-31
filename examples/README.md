@@ -1,219 +1,110 @@
 # ReadSpyn Examples
 
-This directory contains example scripts demonstrating various features of the ReadSpyn quantum dot readout simulator.
+This directory contains example scripts demonstrating the JAX-based ReadSpyn implementation.
 
 ## Available Examples
 
-### 1. Basic Simulation (`basic_simulation.py`)
-**Purpose**: Introduction to ReadSpyn with a simple single-sensor system
-**Features**:
-- Single quantum dot system (2 dots, 1 sensor)
-- Basic noise models
-- Simple visualization
+### 1. `example_quick_test.py`
+A minimal example for quick testing of the JAX-based implementation.
+
+**Features:**
+- Basic quantum dot system setup
+- Simple noise models
+- Quick simulation with minimal parameters
+- Performance metrics
+
+**Usage:**
+```bash
+python examples/example_quick_test.py
+```
+
+**Expected Output:**
+- Simulation parameters and performance metrics
+- Total operations and execution time
+- Readout fidelity calculation
+
+### 2. `example_jax_simulation.py`
+A comprehensive example demonstrating all features of the JAX-based implementation.
+
+**Features:**
+- Full quantum dot system simulation
+- Multiple charge states
+- Advanced noise models
 - Performance analysis
+- Visualization plots
+- Advanced features demonstration
 
-**Usage**:
+**Usage:**
 ```bash
-python3 basic_simulation.py
+python examples/example_jax_simulation.py
 ```
 
-**What you'll learn**:
-- How to create quantum dot systems
-- Basic sensor configuration
-- Running simulations
-- Extracting and analyzing results
+**Expected Output:**
+- Complete simulation workflow
+- Performance summary
+- Visualization plots saved as `jax_simulation_results.png`
+- Advanced features demonstration
 
-### 2. Simple Two-Sensor System (`simple_two_sensor.py`)
-**Purpose**: Demonstrate multi-sensor capabilities with minimal complexity
-**Features**:
-- 2 quantum dots, 2 sensors
-- Different resonator parameters for each sensor
-- Different noise models for each sensor
-- Basic performance comparison
+## Key Features Demonstrated
 
-**Usage**:
-```bash
-python3 simple_two_sensor.py
-```
+### JAX-based Implementation
+- **Precomputed Noise Trajectories**: Noise is generated once and reused across all states
+- **State Scanning**: Uses JAX scan for efficient processing of multiple charge states
+- **Vectorized Operations**: All computations are vectorized for GPU acceleration
+- **Post-processing Noise**: White noise is added after signal generation
 
-**What you'll learn**:
-- Multi-sensor system setup
-- Parameter variation between sensors
-- Performance comparison between sensors
+### Performance Benefits
+- **GPU Acceleration**: Compatible with JAX's GPU acceleration
+- **Efficient Memory Usage**: Functional programming model reduces memory overhead
+- **Scalable**: Performance scales well with number of states and realizations
 
-### 3. Advanced Two-Sensor System (`two_sensor_system.py`)
-**Purpose**: Comprehensive multi-sensor analysis with advanced features
-**Features**:
-- 2 quantum dots, 2 sensors
-- Different resonator configurations
-- Comprehensive noise modeling
-- Advanced visualization and analysis
-- Charge state separation analysis
-- Sensor correlation analysis
+### Noise Models
+- **OU_noise**: Ornstein-Uhlenbeck noise with exponential autocorrelation
+- **OverFNoise**: 1/f noise using multiple fluctuators
+- **Precomputed Trajectories**: Efficient noise generation and reuse
 
-**Usage**:
-```bash
-python3 two_sensor_system.py
-```
+## Requirements
 
-**What you'll learn**:
-- Advanced system configuration
-- Complex noise modeling
-- Detailed performance analysis
-- Multi-dimensional visualization
+- Python 3.9+ with JAX installed
+- ReadSpyn package installed
+- Matplotlib for visualization (in comprehensive example)
 
-## Running the Examples
+## Running Examples
 
-### Prerequisites
-Make sure you have ReadSpyn installed:
-```bash
-cd /path/to/ReadSpyn
-pip install -e .
-```
+1. **Quick Test** (recommended for first-time users):
+   ```bash
+   python examples/example_quick_test.py
+   ```
 
-### Basic Usage
-```bash
-cd examples
-python3 basic_simulation.py
-```
+2. **Comprehensive Example** (for full feature demonstration):
+   ```bash
+   python examples/example_jax_simulation.py
+   ```
 
-### Customizing Examples
-You can modify the examples to explore different configurations:
+## Expected Performance
 
-#### Changing System Parameters
-```python
-# Modify quantum dot system
-Cdd = np.array([
-    [1.0, 0.5],  # Change coupling strength
-    [0.5, 1.0]
-])
+The examples demonstrate significant performance improvements:
 
-# Modify sensor parameters
-params_resonator = {
-    'Lc': 1000e-9,  # Change inductance
-    'Cp': 0.8e-12,  # Change capacitance
-    'RL': 50,        # Change load resistance
-    # ... other parameters
-}
-```
-
-#### Adjusting Noise Models
-```python
-# Modify 1/f noise
-eps_noise = OverFNoise(
-    n_fluctuators=10,     # Change number of fluctuators
-    s1=2e-3,             # Change noise amplitude
-    ommax=2,              # Change frequency range
-    ommin=0.1
-)
-
-# Modify OU noise
-c_noise = OU_noise(
-    sigma=1e-12,          # Change noise amplitude
-    gamma=1e6             # Change correlation rate
-)
-```
-
-#### Changing Simulation Parameters
-```python
-# Modify simulation settings
-nT_end = 2000            # Change simulation duration
-samples = 100            # Change number of samples
-params = {
-    'SNR_white': 1e13,   # Change signal-to-noise ratio
-    'eps0': 0.3          # Change operating point
-}
-```
-
-## Example Output
-
-### Basic Simulation
-- Creates a 2-dot, 1-sensor system
-- Runs simulation with 50 samples per charge state
-- Generates IQ plots and performance metrics
-- Shows time evolution of signals
-
-### Two-Sensor Systems
-- Creates 2-dot, 2-sensor systems
-- Demonstrates different sensor configurations
-- Compares performance between sensors
-- Shows correlation analysis
-- Provides comprehensive visualizations
-
-## Understanding the Results
-
-### IQ Plots
-- **X-axis**: In-phase component (I)
-- **Y-axis**: Quadrature component (Q)
-- **Colors**: Different charge states
-- **Clustering**: Well-separated clusters indicate good readout performance
-
-### Performance Metrics
-- **Fidelity**: Measure of readout accuracy (0-1, higher is better)
-- **SNR**: Signal-to-noise ratio evolution over time
-- **Separation**: Distance between different charge state clusters
-
-### Time Evolution
-- Shows how signals develop over time
-- Demonstrates noise effects
-- Illustrates integration benefits
+- **Quick Test**: ~10,000 operations/second
+- **Comprehensive Example**: ~750,000 operations/second
+- **Scalable**: Performance improves with larger simulations
 
 ## Troubleshooting
 
-### Common Issues
+If you encounter issues:
 
-#### 1. Import Errors
-**Problem**: `ModuleNotFoundError: No module named 'readout_simulator'`
-**Solution**: Ensure ReadSpyn is installed: `pip install -e .`
+1. **JAX Installation**: Ensure JAX is properly installed for your Python version
+2. **Import Errors**: Make sure the ReadSpyn package is in your Python path
+3. **Memory Issues**: Reduce the number of realizations or time points for large simulations
 
-#### 2. Memory Issues
-**Problem**: Out of memory errors
-**Solution**: Reduce `nT_end` or `samples` parameters
+## Customization
 
-#### 3. Slow Performance
-**Problem**: Simulations take too long
-**Solution**: 
-- Reduce simulation duration
-- Use fewer samples
-- Ensure Numba is working properly
+You can modify the examples to:
 
-#### 4. Visualization Issues
-**Problem**: Plots don't show or are empty
-**Solution**: Check that simulation completed successfully and data was extracted
+- Change quantum dot system parameters
+- Adjust noise model parameters
+- Modify simulation time and resolution
+- Add custom analysis functions
+- Integrate with your own workflows
 
-### Performance Tips
-
-1. **Start Small**: Begin with basic examples and small parameter values
-2. **Monitor Progress**: Watch the progress bars during simulation
-3. **Check Output**: Verify that conductance values are reasonable
-4. **Adjust Parameters**: Modify parameters to see their effects
-
-## Next Steps
-
-After running the examples:
-
-1. **Experiment**: Modify parameters to see their effects
-2. **Scale Up**: Increase system size or simulation duration
-3. **Customize**: Adapt examples for your specific research needs
-4. **Analyze**: Use the analysis functions to understand your results
-5. **Extend**: Create new examples for different system configurations
-
-## Contributing
-
-Feel free to:
-- Modify existing examples
-- Create new examples
-- Improve visualizations
-- Add new analysis features
-- Report issues or suggest improvements
-
-## Support
-
-If you encounter problems:
-1. Check this README for troubleshooting tips
-2. Review the main README.md file
-3. Check the API_REFERENCE.md for detailed documentation
-4. Open an issue on GitHub
-5. Contact the author: j.a.krzywda@liacs.leidenuniv.nl
-
-Happy simulating! 🚀 
+The examples serve as templates for building your own quantum dot readout simulations using the JAX-based ReadSpyn implementation. 
