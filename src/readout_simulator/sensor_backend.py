@@ -164,6 +164,91 @@ class RLC_sensor:
         else:
             print("  Energy noise model: None")
 
+    def calculate_meaningful_snr(self, dot_system: QuantumDotSystem, 
+                               charge_states: list, sensor_index: int = 0) -> float:
+        """
+        Calculate a meaningful SNR based on conductance difference between charge states.
+        
+        SNR = |G(state1) - G(state2)| / mean(G(state1), G(state2))
+        
+        Args:
+            dot_system: Quantum dot system
+            charge_states: List of charge state arrays to compare (typically 2 states)
+            sensor_index: Index of the sensor to analyze
+            
+        Returns:
+            float: SNR as the ratio of conductance difference to average conductance
+        """
+        if len(charge_states) < 2:
+            raise ValueError("At least 2 charge states are required for SNR calculation")
+        
+        # Calculate energy offsets for each charge state
+        sensor_voltages = np.zeros(dot_system.Cds.shape[1])
+        energy_offsets = []
+        
+        for charge_state in charge_states:
+            energy_offset = dot_system.get_energy_offset(charge_state, sensor_voltages, self.eps0)[sensor_index]
+            energy_offsets.append(energy_offset)
+        
+        # Calculate conductances for each charge state
+        conductances = [conductance_fun_numba(eps, self.eps_w, self.R0) for eps in energy_offsets]
+        
+        # Calculate the conductance difference between states
+        conductance_diff = abs(conductances[1] - conductances[0])
+        
+        # Calculate the average conductance (for normalization)
+        avg_conductance = np.mean(conductances)
+        
+        # Return SNR as the ratio of conductance difference to average conductance
+        return conductance_diff / avg_conductance
+
+    def get_snr_details(self, dot_system: QuantumDotSystem, 
+                        charge_states: list, sensor_index: int = 0) -> dict:
+        """
+        Get detailed SNR information including conductances and energy offsets.
+        
+        Args:
+            dot_system: Quantum dot system
+            charge_states: List of charge state arrays to compare
+            sensor_index: Index of the sensor to analyze
+            
+        Returns:
+            dict: Detailed SNR information
+        """
+        if len(charge_states) < 2:
+            raise ValueError("At least 2 charge states are required for SNR calculation")
+        
+        # Calculate energy offsets for each charge state
+        sensor_voltages = np.zeros(dot_system.Cds.shape[1])
+        energy_offsets = []
+        
+        for charge_state in charge_states:
+            energy_offset = dot_system.get_energy_offset(charge_state, sensor_voltages, self.eps0)[sensor_index]
+            energy_offsets.append(energy_offset)
+        
+        # Calculate conductances for each charge state
+        conductances = [conductance_fun_numba(eps, self.eps_w, self.R0) for eps in energy_offsets]
+        
+        # Calculate the conductance difference between states
+        conductance_diff = abs(conductances[1] - conductances[0])
+        
+        # Calculate the average conductance (for normalization)
+        avg_conductance = np.mean(conductances)
+        
+        # Calculate SNR
+        snr = conductance_diff / avg_conductance
+        
+        return {
+            'snr': snr,
+            'energy_offsets': energy_offsets,
+            'conductances': conductances,
+            'conductance_difference': conductance_diff,
+            'average_conductance': avg_conductance,
+            'charge_states': charge_states,
+            'eps_w': self.eps_w,
+            'R0': self.R0
+        }
+
     def get_signal(self, times: np.ndarray, dot_system: QuantumDotSystem,
                    charge_state: np.ndarray, sensor_index: int, params: Dict[str, Any],
                    noise_trajectory: Optional[np.ndarray] = None) -> tuple:
@@ -189,8 +274,16 @@ class RLC_sensor:
         sensor_voltages = np.zeros(dot_system.Cds.shape[1])
         energy_offset = dot_system.get_energy_offset(charge_state, sensor_voltages, eps0)[sensor_index]
         
+        # Calculate meaningful SNR if charge states are provided
         SNR_white = params.get('SNR_white', 1.0)
-        SNR_eff = params.get('SNR_eff', SNR_white)
+        print(SNR_white)
+        if 'charge_states' in params:
+            # Calculate SNR based on conductance difference between charge states
+            meaningful_snr = self.calculate_meaningful_snr(dot_system, params['charge_states'], sensor_index)
+            SNR_eff = meaningful_snr * SNR_white  # Scale by the provided factor
+        else:
+            SNR_eff = params.get('SNR_eff', SNR_white)
+        
         t_end = times[-1]
         
         # Apply noise trajectory if provided
@@ -198,13 +291,13 @@ class RLC_sensor:
 
         # Create interpolator for energy values
         eps_interpolator = interp1d(times, eps_values, kind='cubic', 
-                                   fill_value="extrapolate", bounds_error=False)
+                                   fill_value="extrapolate", bounds_error=False)  #can we avoid interpolation?
         
         # Initial conditions and effective resistance
         y0 = [0.0, 0.0]  # [v_Cp, i_L]
         RL_effective = self.RL + self.Z0
         
-        def v_s_source_func(t):
+        def v_s_source_func(t):  #TODO: input
             """Source voltage function."""
             return 1.0 * np.sin(self.omega0 * t)
 
@@ -233,15 +326,17 @@ class RLC_sensor:
         # Extract current and calculate reflected voltage
         i_L_sim = sol.y[1, :]
         V_s_t = v_s_source_func(sol.t)
-        
+           
         # Add noise based on SNR
-        amp = np.std(V_s_t) / np.sqrt(SNR_eff)
-        V_refl_t = (V_s_t - self.Z0 * i_L_sim - (V_s_t / 2.0) + 
-                    np.random.normal(0, 1, len(V_s_t)) * amp)
+    
+        V_refl_t = (V_s_t - self.Z0 * i_L_sim - (V_s_t / 2.0)) 
+
+        
         
         # Extract I and Q components using Hilbert transform
-        V_refl_phasor = hilbert(V_refl_t) * np.exp(-1j * self.omega0 * sol.t)
+        V_refl_phasor = hilbert(V_refl_t) * np.exp(-1j * self.omega0 * sol.t)  # why if we add noise here results are quantised?
         I = np.real(V_refl_phasor) 
         Q = np.imag(V_refl_phasor)
+        
 
         return I, Q, V_refl_t, times

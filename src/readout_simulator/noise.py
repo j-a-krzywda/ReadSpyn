@@ -96,7 +96,6 @@ class Telegraph_Noise:
         
         Args:
             x0: New initial value (if None, use original x0)
-            
         Returns:
             float: Reset noise value
         """

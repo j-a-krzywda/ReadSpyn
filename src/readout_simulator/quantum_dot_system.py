@@ -76,7 +76,7 @@ class QuantumDotSystem:
         return cls(Cdd, Cds)
 
     def get_energy_offset(self, charge_state: np.ndarray, 
-                         sensor_voltages: np.ndarray, 
+                         sensor_voltages: np.ndarray,   #TODO: change to detuning
                          eps0: float) -> np.ndarray:
         """
         Calculate the energy offset for each sensor.

@@ -63,11 +63,11 @@ class ReadoutSimulator:
         # Loop over sensors
         for sensor_index, sensor in enumerate(self.sensors):
             dt = 0.5e-9  # Time step in seconds
-            times = np.arange(0, t_end * sensor.T0, dt)
+            times = np.arange(0, t_end * sensor.T0, dt)   # TODO: Define global time 
             num_points = len(times)
             
             # Calculate conductance function
-            def conductance_fun(eps):
+            def conductance_fun(eps): #TODO: funciton of a sensor?
                 return np.cosh(eps / sensor.eps_w)**(-2) / sensor.R0
             
             # Calculate energy offsets for each charge state
@@ -79,15 +79,20 @@ class ReadoutSimulator:
             # Calculate conductance values
             g_values = [conductance_fun(eo) for eo in energy_offsets]
    
-            
-            # Adjust SNR based on conductance variation
-            params['SNR_eff'] = params['SNR_white'] * (np.max(g_values) - np.min(g_values)) / np.mean(g_values)
-
-       
-            
-            
             # Get unique charge states for labeling
             unique_states = np.unique(charge_states, axis=0)
+            
+            # Calculate meaningful SNR based on conductance difference between charge states
+            if len(unique_states) >= 2:
+                # Use the first two unique charge states for SNR calculation
+                charge_states_for_snr = [unique_states[0], unique_states[1]]
+                meaningful_snr = sensor.calculate_meaningful_snr(self.dot_system, charge_states_for_snr, sensor_index)
+                params['SNR_eff'] = meaningful_snr * params['SNR_white']
+                print(f"Sensor {sensor_index}: Calculated meaningful SNR = {meaningful_snr:.3f}")
+            else:
+                # Fallback to conductance variation method
+                params['SNR_eff'] = params['SNR_white'] * (np.max(g_values) - np.min(g_values)) / np.mean(g_values)
+                print(f"Sensor {sensor_index}: Using conductance variation SNR = {params['SNR_eff']:.3f}")
             
             # Optional conductance plotting
             if params.get('plot_conductance', False):
@@ -99,7 +104,7 @@ class ReadoutSimulator:
             for i, charge_state in enumerate(tqdm(charge_states, desc=f"Sensor {sensor_index}")):
                 # Generate noise trajectory
                  #faster sim
-                noise_trajectory = sensor.eps_noise_model.generate_trajectory(num_points) 
+                noise_trajectory = sensor.eps_noise_model.generate_trajectory(num_points)  # precompute that and make it vectroe
                 # Get sensor signal
                 I, Q, V_refl_t, times = sensor.get_signal(
                     times, self.dot_system, charge_state, sensor_index, params, noise_trajectory
