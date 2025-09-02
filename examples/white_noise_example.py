@@ -32,6 +32,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 try:
     from readout_simulator import (
         QuantumDotSystem, 
+        GeometricQuantumDotSystem,
         RLC_sensor, 
         JAXReadoutSimulator,
         OU_noise, 
@@ -50,9 +51,16 @@ def main():
     key = jax.random.PRNGKey(42)
     
     # Define quantum dot system (2 dots, 1 sensor)
+    # Method 1: Direct capacitance matrix definition
     Cdd = jnp.array([[1.0, 0.1], [0.1, 1.0]])  # 2x2 dot-dot capacitance matrix
     Cds = jnp.array([[0.6], [0.3]])  # 2x1 dot-sensor coupling matrix
     dot_system = QuantumDotSystem(Cdd, Cds)
+    
+    # Alternative Method 2: Geometric definition
+    # dot_positions = np.array([[0.0, 0.0], [100.0, 0.0]])  # 2 dots
+    # sensor_positions = np.array([[50.0, 50.0]])  # 1 sensor
+    # geo_system = GeometricQuantumDotSystem(dot_positions, sensor_positions, C0=1e-15, alpha=1.0, beta=0.01)
+    # dot_system = geo_system.dot_system
     
     print(f"Quantum dot system: {dot_system.num_dots} dots, {dot_system.num_sensors} sensors")
     
@@ -96,12 +104,12 @@ def main():
         print(f"  State {i}: {state}")
     
     # Define simulation parameters
-    t_end = 1000 * sensor.T0  # 1000 resonant periods
-    dt = 0.5e-9  # 0.5 ns time step
+    t_end = 1e-6  # 1 μs absolute end time
+    dt = 0.5e-9   # 0.5 ns time step (configurable)
     times = jnp.arange(0, t_end, dt)
     
     print(f"\nSimulation parameters:")
-    print(f"  End time: {t_end*1e6:.2f} μs")
+    print(f"  End time: {t_end*1e6:.2f} μs (absolute)")
     print(f"  Time step: {dt*1e9:.1f} ns")
     print(f"  Number of time points: {len(times)}")
     
