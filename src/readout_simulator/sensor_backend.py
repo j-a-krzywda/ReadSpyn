@@ -424,20 +424,26 @@ class RLC_sensor:
             # Calculate time step
             dt = times[1] - times[0]
             
-            # Calculate noise variance to get exact SNR scaling
-            # We want: effective_SNR = signal_separation / noise_std = snr
-            # So: noise_std = signal_separation / snr
-            # Since signal_separation ∝ <d_ij> and noise_std = sqrt(Y * dt)
-            # We need: sqrt(Y * dt) = <d_ij> / snr
-            # Therefore: Y * dt = (<d_ij> / snr)^2
-            # This gives us: Y = <d_ij>^2 / (snr^2 * dt)
-            Y = (avg_separation / snr)**2 * 1/times[-1]
+            
+            # Calculate noise variance to get final SNR after integration
+            # We want: final_SNR = signal_separation / noise_std_after_integration = snr
+            # After integration: noise_std_after_integration = sqrt(Y * dt * n_points)
+            # So: snr = signal_separation / sqrt(Y * dt * n_points)
+            # Therefore: Y * dt * n_points = (signal_separation / snr)^2
+            # This gives us: Y = (signal_separation / snr)^2 / (dt * n_points)
+            # Note: Since we have both I and Q components, the total noise variance is 2*Y*dt
+            # So we need to account for the √2 factor: Y = (signal_separation / snr)^2 / (2 * dt * n_points)
+            dt = times[1] - times[0]
+            t_end = times[-1]
+            Y = (avg_separation / snr)**2 * t_end / (dt**2)/2
             
             # Generate Wiener process increments
             # Use a more varied key to ensure different noise for different realizations, charge states, and sensors
             # Include the charge state in the key to ensure different noise for different states
             charge_state_hash = jnp.sum(charge_state).astype(jnp.int32) if hasattr(charge_state, 'shape') else 0
-            noise_key = jax.random.fold_in(key, jnp.sum(noise_trajectory).astype(jnp.int32) + sensor_index * 1000 + charge_state_hash * 100)
+            # Use a more unique key that includes the charge state pattern, not just the sum
+            charge_state_key = jnp.sum(charge_state * jnp.arange(len(charge_state))).astype(jnp.int32)
+            noise_key = jax.random.fold_in(key, jnp.sum(noise_trajectory).astype(jnp.int32) + sensor_index * 1000 + charge_state_key * 100)
             
             # Generate Wiener process increments (dw) - these should be different for each time step
             dw_I = jax.random.normal(noise_key, shape=I.shape) * jnp.sqrt(dt)

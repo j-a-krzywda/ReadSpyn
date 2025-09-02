@@ -118,7 +118,7 @@ def main():
     
     # Test different SNR values - now scaled to reflect effective SNR
     # We'll use smaller values since the effective SNR is much higher
-    snr_values = [0.01,0.1,1,10]
+    snr_values = [0.1, 0.5, 1, 2]
     results_dict = {}
     
     for snr in snr_values:
@@ -197,13 +197,13 @@ def main():
         dt = times[1] - times[0]
         n_points = len(times)
         
-        # Calculate the white noise parameter Y (matching the sensor backend formula)
-        Y = (avg_separation / snr)**2 / dt
+                # Calculate the white noise parameter Y (matching the sensor backend formula)
+        Y = (avg_separation / snr)**2 / (2 * dt * n_points)  # Account for I and Q components
         
-        # The theoretical noise level after integration is:
-        # noise_level = sqrt(Y * dt * n_points)
-        # This accounts for the fact that integrated white noise has variance Y * dt * n_points
-        theoretical_noise_level = float(jnp.sqrt(Y * dt * n_points))
+        # The theoretical noise level after integration (averaging) is:
+        # For cumulative averaging: noise_level = sqrt(Y * dt / n_points)
+        # This accounts for both I and Q components contributing to the total noise
+        theoretical_noise_level = float(jnp.sqrt(Y * dt / n_points))
         
         # Use the correct empirical noise level for SNR calculation
         noise_level = empirical_noise_level
