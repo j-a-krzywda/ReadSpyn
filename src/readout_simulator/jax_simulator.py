@@ -118,6 +118,8 @@ class JAXReadoutSimulator:
             charge_states: Array of charge states to simulate (n_states, n_dots)
             times: Time array
             params: Dictionary containing simulation parameters
+                - snr: Signal-to-noise ratio for white noise (optional)
+                - t_end: End time for SNR calculation (optional)
             key: JAX PRNG key for random number generation
             
         Returns:
@@ -148,15 +150,27 @@ class JAXReadoutSimulator:
             # Calculate conductance values
             conductance_values = self._calculate_conductance(energy_offsets, sensor)
             
+            # Calculate average separation for white noise amplitude
+            avg_separation = self.calculate_average_separation(charge_states, sensor_idx)
+            
+            # Add separation and SNR parameters to params
+            sensor_params = params.copy()
+            sensor_params['avg_separation'] = avg_separation
+            sensor_params['t_end'] = params.get('t_end', times[-1])
+            sensor_params['snr'] = params.get('snr', 1.0)
+            
+            print(f"Sensor {sensor_idx}: Average separation = {avg_separation:.6f}")
+            
             # Run simulation for this sensor using JAX scan
             sensor_results = self._simulate_sensor(
-                sensor, sensor_idx, charge_states, times, params, key
+                sensor, sensor_idx, charge_states, times, sensor_params, key
             )
             
             # Add sensor-specific results
             sensor_results.update({
                 'energy_offsets': energy_offsets,
-                'conductance_values': conductance_values
+                'conductance_values': conductance_values,
+                'avg_separation': avg_separation
             })
             
             self.results['sensor_results'].append(sensor_results)
@@ -200,7 +214,7 @@ class JAXReadoutSimulator:
             jax.Array: Conductance values
         """
         def conductance_fun(eps):
-            return jnp.cosh(eps / sensor.eps_w)**(-2) / sensor.R0
+            return 2 * jnp.cosh(2 * eps / sensor.eps_w)**(-2) / sensor.R0
         
         return jax.vmap(conductance_fun)(energy_offsets)
     
@@ -403,4 +417,68 @@ class JAXReadoutSimulator:
                     sensor_state_results[key] = value
             results[f'sensor_{sensor_idx}'] = sensor_state_results
         
-        return results 
+        return results
+    
+    def calculate_average_separation(self, charge_states: jax.Array, sensor_idx: int = 0, t_end: float = None) -> float:
+        """
+        Calculate the average separation d_ij between charge states in IQ space.
+        
+        This method simulates the system with intrinsic noise (epsilon and c) to compute
+        the separation between different charge states in the IQ plane after integration,
+        which is then used to determine the amplitude of white noise to be added.
+        
+        Args:
+            charge_states: Array of charge states to compare (n_states, n_dots)
+            sensor_idx: Index of the sensor to analyze
+            t_end: End time for the separation calculation (should match main simulation)
+            
+        Returns:
+            float: Average separation <d_ij> between charge states in IQ space
+        """
+        if charge_states.shape[0] < 2:
+            raise ValueError("At least 2 charge states are required for separation calculation")
+        
+        # We need to run a quick simulation to get the IQ separations
+        # Use the same time duration as the main simulation for consistency
+        sensor = self.sensors[sensor_idx]
+        if t_end is None:
+            t_end = 1000 * sensor.T0  # Default fallback
+        dt = 0.5e-9
+        times = jnp.arange(0, t_end, dt)
+        
+        # Create a simple noise trajectory (zeros for this calculation)
+        noise_trajectory = jnp.zeros_like(times)
+        
+        # Calculate IQ signals for each charge state
+        iq_points = []
+        for i, charge_state in enumerate(charge_states):
+            # Get signal without additional white noise
+            params = {'eps0': 0.0, 'avg_separation': 0.0, 'snr': 1.0, 't_end': t_end}
+            key = jax.random.PRNGKey(42)
+            I, Q, _ = sensor.get_signal_jax(
+                times, self.dot_system, charge_state, sensor_idx, params, noise_trajectory, key
+            )
+            
+            # Integrate the signals
+            I_integrated = jnp.cumsum(I) / jnp.arange(1, len(I) + 1)
+            Q_integrated = jnp.cumsum(Q) / jnp.arange(1, len(Q) + 1)
+            
+            # Use final integrated values
+            iq_points.append([I_integrated[-1], Q_integrated[-1]])
+        
+        iq_points = jnp.array(iq_points)
+        
+        # Calculate separations between all pairs of states in IQ space
+        separations = []
+        n_states = len(charge_states)
+        for i in range(n_states):
+            for j in range(i + 1, n_states):
+                # Separation is the Euclidean distance in IQ space
+                separation = jnp.linalg.norm(iq_points[i] - iq_points[j])
+                separations.append(separation)
+        
+        # Return average separation
+        if separations:
+            return float(jnp.mean(jnp.array(separations)))
+        else:
+            return 0.0 

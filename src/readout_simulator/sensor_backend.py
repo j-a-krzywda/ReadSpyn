@@ -366,6 +366,9 @@ class RLC_sensor:
             charge_state: Charge state vector
             sensor_index: Index of this sensor
             params: Simulation parameters
+                - avg_separation: Average separation <d_ij> between charge states
+                - snr: Signal-to-noise ratio for white noise
+                - t_end: End time for SNR calculation
             noise_trajectory: Precomputed noise trajectory
             
         Returns:
@@ -378,16 +381,12 @@ class RLC_sensor:
         sensor_voltages = jnp.zeros(dot_system.Cds.shape[1])
         energy_offset = dot_system.get_energy_offset(charge_state, sensor_voltages, eps0)[sensor_index]
         
-        # Calculate effective SNR
-        SNR_white = params.get('SNR_white', 1.0)
-        SNR_eff = params.get('SNR_eff', SNR_white)
-        
         # Apply noise trajectory
         eps_values = noise_trajectory + energy_offset
         
         # Calculate conductance values
         def conductance_fun(eps):
-            return jnp.cosh(eps / self.eps_w)**(-2) / self.R0
+            return 2 * jnp.cosh(2 * eps / self.eps_w)**(-2) / self.R0
         
         conductances = jax.vmap(conductance_fun)(eps_values)
         
@@ -398,20 +397,12 @@ class RLC_sensor:
         # This is a simplified version that avoids ODE solving for efficiency
         V_refl_t = V_s_t * (1 - conductances / (conductances + self.Z0))
         
-        # Add white noise based on SNR
-        # Use a deterministic key based on the noise trajectory to ensure different noise for different realizations
-        noise_key = jax.random.fold_in(key, jnp.sum(noise_trajectory).astype(jnp.int32))
-        noise_amplitude = jnp.sqrt(SNR_eff) * jnp.std(V_refl_t)
-        white_noise = jax.random.normal(noise_key, shape=V_refl_t.shape) * noise_amplitude
-        V_refl_t = V_refl_t + white_noise
-        
         # Extract I and Q components using simplified demodulation
         # For JAX compatibility, we use a simpler approach than Hilbert transform
         I = V_refl_t * jnp.cos(self.omega0 * times)
         Q = V_refl_t * jnp.sin(self.omega0 * times)
         
         # Apply low-pass filtering (simplified)
-        
         def low_pass_filter(signal):
             # Simple moving average as low-pass filter
             window_size = min(10, len(signal) // 10)
@@ -420,5 +411,44 @@ class RLC_sensor:
         
         I = low_pass_filter(I)
         Q = low_pass_filter(Q)
+        
+        # Add white noise to I and Q before integration
+        # According to the specification:
+        # dI = x<d_ij>dt/2 + sqrt(Y) dw
+        # where Y = <d_ij>/(t_end * snr)
+        avg_separation = params.get('avg_separation', 0.0)
+        snr = params.get('snr', 1.0)
+        t_end = params.get('t_end', times[-1])
+        
+        if avg_separation > 0 and snr > 0:
+            # Calculate time step
+            dt = times[1] - times[0]
+            
+            # Calculate noise variance to get exact SNR scaling
+            # We want: effective_SNR = signal_separation / noise_std = snr
+            # So: noise_std = signal_separation / snr
+            # Since signal_separation ∝ <d_ij> and noise_std = sqrt(Y * dt)
+            # We need: sqrt(Y * dt) = <d_ij> / snr
+            # Therefore: Y * dt = (<d_ij> / snr)^2
+            # This gives us: Y = <d_ij>^2 / (snr^2 * dt)
+            Y = (avg_separation / snr)**2 * 1/times[-1]
+            
+            # Generate Wiener process increments
+            # Use a more varied key to ensure different noise for different realizations, charge states, and sensors
+            # Include the charge state in the key to ensure different noise for different states
+            charge_state_hash = jnp.sum(charge_state).astype(jnp.int32) if hasattr(charge_state, 'shape') else 0
+            noise_key = jax.random.fold_in(key, jnp.sum(noise_trajectory).astype(jnp.int32) + sensor_index * 1000 + charge_state_hash * 100)
+            
+            # Generate Wiener process increments (dw) - these should be different for each time step
+            dw_I = jax.random.normal(noise_key, shape=I.shape) * jnp.sqrt(dt)
+            dw_Q = jax.random.normal(jax.random.fold_in(noise_key, 1), shape=Q.shape) * jnp.sqrt(dt)
+            
+            # Add white noise: dI = sqrt(Y) dw
+            # The signal component should come from the underlying I and Q signals, not be added separately
+            noise_component_I = jnp.sqrt(Y) * dw_I
+            noise_component_Q = jnp.sqrt(Y) * dw_Q
+            
+            I = I + noise_component_I
+            Q = Q + noise_component_Q
         
         return I, Q, V_refl_t
