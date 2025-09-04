@@ -4,46 +4,68 @@ This directory contains example scripts demonstrating the JAX-based ReadSpyn imp
 
 ## Available Examples
 
-### 1. `example_quick_test.py`
-A minimal example for quick testing of the JAX-based implementation.
+### 1. `white_noise_example.py`
+A comprehensive example demonstrating white noise effects in quantum dot readout.
 
 **Features:**
-- Basic quantum dot system setup
-- Simple noise models
-- Quick simulation with minimal parameters
-- Performance metrics
+- Two-dot, one-sensor system
+- White noise (OU noise) affecting capacitance
+- 1/f noise affecting energy offset
+- Signal quality analysis with SNR and separation metrics
+- I, Q scatter plots and performance visualization
 
 **Usage:**
 ```bash
-python examples/example_quick_test.py
+python examples/white_noise_example.py
 ```
 
 **Expected Output:**
-- Simulation parameters and performance metrics
-- Total operations and execution time
-- Readout fidelity calculation
+- Simulation parameters and system setup
+- Signal quality metrics (separation, noise level, SNR)
+- Performance analysis plots
+- Comprehensive noise effects demonstration
 
-### 2. `example_jax_simulation.py`
-A comprehensive example demonstrating all features of the JAX-based implementation.
+### 2. `simple_1f_noise_example.py`
+A focused example demonstrating 1/f noise effects with asymmetric coupling.
 
 **Features:**
-- Full quantum dot system simulation
-- Multiple charge states
-- Advanced noise models
-- Performance analysis
-- Visualization plots
-- Advanced features demonstration
+- Two-dot, one-sensor system with asymmetric coupling
+- 1/f noise affecting energy offset (epsilon)
+- White noise (OU noise) affecting capacitance
+- Coulomb peak visualization showing asymmetric coupling
+- Parameter study of different 1/f noise amplitudes
+- Signal degradation analysis
 
 **Usage:**
 ```bash
-python examples/example_jax_simulation.py
+python examples/simple_1f_noise_example.py
 ```
 
 **Expected Output:**
-- Complete simulation workflow
-- Performance summary
-- Visualization plots saved as `jax_simulation_results.png`
-- Advanced features demonstration
+- Coulomb peaks plot showing asymmetric coupling effects
+- Clean vs noisy signal comparison
+- 1/f noise parameter study results
+- Signal degradation analysis plots
+- Comprehensive noise effects demonstration
+
+### 3. `geometric_system_example.py`
+A geometric example demonstrating quantum dot system creation from spatial positions.
+
+**Features:**
+- Geometric quantum dot system creation
+- Capacitance calculation from spatial positions
+- Basic simulation setup
+- System parameter demonstration
+
+**Usage:**
+```bash
+python examples/geometric_system_example.py
+```
+
+**Expected Output:**
+- Geometric system setup and parameters
+- Capacitance matrix calculations
+- Basic simulation demonstration
 
 ## Key Features Demonstrated
 
@@ -53,41 +75,64 @@ python examples/example_jax_simulation.py
 - **Vectorized Operations**: All computations are vectorized for GPU acceleration
 - **Post-processing Noise**: White noise is added after signal generation
 
-### Performance Benefits
-- **GPU Acceleration**: Compatible with JAX's GPU acceleration
-- **Efficient Memory Usage**: Functional programming model reduces memory overhead
-- **Scalable**: Performance scales well with number of states and realizations
-
 ### Noise Models
-- **OU_noise**: Ornstein-Uhlenbeck noise with exponential autocorrelation
+- **OU_noise**: Ornstein-Uhlenbeck noise with exponential autocorrelation (white noise)
 - **OverFNoise**: 1/f noise using multiple fluctuators
 - **Precomputed Trajectories**: Efficient noise generation and reuse
+
+### System Configurations
+- **Two-dot, one-sensor**: Asymmetric coupling demonstration
+- **Geometric systems**: Spatial position-based system creation
+- **Capacitive coupling**: Realistic quantum dot interactions
 
 ## Requirements
 
 - Python 3.9+ with JAX installed
 - ReadSpyn package installed
-- Matplotlib for visualization (in comprehensive example)
+- Matplotlib for visualization
 
 ## Running Examples
 
-1. **Quick Test** (recommended for first-time users):
+1. **White Noise Example** (comprehensive noise effects):
    ```bash
-   python examples/example_quick_test.py
+   python examples/white_noise_example.py
    ```
 
-2. **Comprehensive Example** (for full feature demonstration):
+2. **1/f Noise Example** (asymmetric coupling effects):
    ```bash
-   python examples/example_jax_simulation.py
+   python examples/simple_1f_noise_example.py
+   ```
+
+3. **Geometric System Example** (spatial system creation):
+   ```bash
+   python examples/geometric_system_example.py
    ```
 
 ## Expected Performance
 
 The examples demonstrate significant performance improvements:
 
-- **Quick Test**: ~10,000 operations/second
-- **Comprehensive Example**: ~750,000 operations/second
-- **Scalable**: Performance improves with larger simulations
+- **Efficient JAX operations**: Vectorized computations
+- **GPU acceleration**: Compatible with JAX's GPU acceleration
+- **Scalable**: Performance scales well with number of states and realizations
+
+## Key Insights
+
+### White Noise Example
+- Demonstrates fundamental noise effects in quantum dot readout
+- Shows SNR scaling and signal quality metrics
+- Provides baseline for noise comparison
+
+### 1/f Noise Example
+- Demonstrates asymmetric coupling effects
+- Shows how 1/f noise affects different charge states differently
+- Provides realistic quantum dot system modeling
+- Demonstrates complex noise coupling patterns
+
+### Geometric System Example
+- Shows how to create systems from spatial positions
+- Demonstrates capacitance calculation methods
+- Provides foundation for realistic system modeling
 
 ## Troubleshooting
 

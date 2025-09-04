@@ -159,6 +159,6 @@ If you use ReadSpyn in your research, please cite:
 
 ## Contact
 
-- Author: Jan A. Krzywda
+- Author: Jan A. Krzywda, Rouven K. Koch
 - Email: j.a.krzywda@liacs.leidenuniv.nl
 - GitHub: https://github.com/jkrzywda/ReadSpyn 

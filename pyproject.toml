@@ -10,7 +10,8 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
 authors = [
-    {name = "Jan A. Krzywda", email = "j.a.krzywda@liacs.leidenuniv.nl"}
+    {name = "Jan A. Krzywda", email = "j.a.krzywda@liacs.leidenuniv.nl"},
+    {name = "Rouven K. Koch", email = "R.K.Koch@tudelft.nl"}
 ]
 keywords = ["quantum", "readout", "simulation", "jax", "quantum-dots"]
 classifiers = [
