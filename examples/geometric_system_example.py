@@ -54,70 +54,37 @@ def main():
     # Example 1: Simple 2-dot, 1-sensor system
     print("\n1. Creating a simple 2-dot, 1-sensor system...")
     
-    # Define positions (in arbitrary units, e.g., nanometers)
-    dot_positions = np.array([
-        [0.0, 0.0],    # First dot at origin
-        [100.0, 0.0]   # Second dot 100 units away
-    ])
-    
-    sensor_positions = np.array([
-        [50.0, 50.0]   # Sensor positioned between dots
-    ])
-    
-    # Create geometric system with default parameters
-    geo_system = GeometricQuantumDotSystem(
-        dot_positions=dot_positions,
-        sensor_positions=sensor_positions,
-        C0=1e-15,      # Base capacitance: 1 fF
-        alpha=1.0,     # Coupling strength
-        beta=0.01      # Distance decay (smaller = longer range)
-    )
-    
-    print(f"Created geometric system: {geo_system}")
-    
-    # Plot the system layout
-    print("\nPlotting system layout...")
-    geo_system.plot_system(show_capacitances=True, capacitance_threshold=0.01)
-    
-    # Get coupling information
-    coupling_info = geo_system.get_coupling_info()
-    print(f"\nCoupling information:")
-    print(f"  Dot-dot capacitance matrix:\n{coupling_info['dot_dot_capacitances']}")
-    print(f"  Dot-sensor capacitance matrix:\n{coupling_info['dot_sensor_capacitances']}")
-    print(f"  Effective coupling matrix:\n{coupling_info['coupling_matrix']}")
-    
+   
     # Example 2: More complex 3-dot, 2-sensor system
     print("\n\n2. Creating a more complex 3-dot, 2-sensor system...")
     
     # Define positions for a triangular arrangement
-    dot_positions_2 = np.array([
-        [0.0, 0.0],      # Dot 1
-        [100.0, 0.0],    # Dot 2
-        [50.0, 86.6]     # Dot 3 (equilateral triangle)
+    dot_positions = np.array([
+        [0.0, 0.0],      # Dot 1     # Dot 3 (equilateral triangle)
     ])
     
-    sensor_positions_2 = np.array([
+    sensor_positions = np.array([
         [25.0, 43.3],    # Sensor 1 (center of triangle)
         [75.0, 43.3]     # Sensor 2 (offset from center)
     ])
     
     # Create geometric system with different parameters
-    geo_system_2 = GeometricQuantumDotSystem(
-        dot_positions=dot_positions_2,
-        sensor_positions=sensor_positions_2,
+    geo_system = GeometricQuantumDotSystem(
+        dot_positions=dot_positions,
+        sensor_positions=sensor_positions,
         C0=1e-15,      # Base capacitance: 1 fF
         alpha=0.8,     # Stronger coupling
         beta=0.005     # Longer range coupling
     )
     
-    print(f"Created complex geometric system: {geo_system_2}")
+    print(f"Created complex geometric system: {geo_system}")
     
     # Plot the complex system layout
     print("\nPlotting complex system layout...")
-    geo_system_2.plot_system(show_capacitances=True, capacitance_threshold=0.005)
+    geo_system.plot_system(show_capacitances=True, capacitance_threshold=0.005)
     
     # Get coupling information for complex system
-    coupling_info_2 = geo_system_2.get_coupling_info()
+    coupling_info_2 = geo_system.get_coupling_info()
     print(f"\nComplex system coupling information:")
     print(f"  Average dot-dot coupling: {coupling_info_2['avg_dot_dot_coupling']:.2e} F")
     print(f"  Average dot-sensor coupling: {coupling_info_2['avg_dot_sensor_coupling']:.2e} F")
