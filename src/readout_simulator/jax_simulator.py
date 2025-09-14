@@ -23,7 +23,7 @@ from functools import partial
 
 from .quantum_dot_system import QuantumDotSystem
 from .sensor_backend import RLC_sensor
-from .noise_models import OU_noise, OverFNoise, precompute_noise_trajectories
+from .noise_models import OU_noise, OverFNoise, CorrelatedNoise, precompute_noise_trajectories
 
 
 class JAXReadoutSimulator:
@@ -68,7 +68,7 @@ class JAXReadoutSimulator:
                         key: jax.random.PRNGKey,
                         times: jax.Array,
                         n_realizations: int,
-                        noise_model: Union[OU_noise, OverFNoise]) -> None:
+                        noise_model: Union[OU_noise, OverFNoise, CorrelatedNoise]) -> None:
         """
         Precompute noise trajectories for all realizations.
         
@@ -79,30 +79,52 @@ class JAXReadoutSimulator:
             key: JAX PRNG key for random number generation
             times: Time array
             n_realizations: Number of noise realizations to generate
-            noise_model: Noise model to use
+            noise_model: Noise model to use (can be correlated for multiple sensors)
         """
         print(f"Precomputing {n_realizations} noise trajectory segments...")
         
-        # Generate one long continuous trajectory
-        # Make it longer to accommodate all realizations
-        extended_times = jnp.arange(0, times[-1] * n_realizations, times[1] - times[0])
-        long_trajectory = noise_model.generate_trajectory(key, extended_times)
-        
-        # Split into segments for different realizations
-        segment_length = len(times)
-        segments = []
-        for i in range(n_realizations):
-            start_idx = i * segment_length
-            end_idx = (i + 1) * segment_length
-            if end_idx <= len(long_trajectory):
-                segments.append(long_trajectory[start_idx:end_idx])
-            else:
-                # If we don't have enough data, pad with zeros
-                segment = long_trajectory[start_idx:]
-                padding = jnp.zeros(segment_length - len(segment))
-                segments.append(jnp.concatenate([segment, padding]))
-        
-        self.noise_trajectories = jnp.array(segments)
+        # Check if this is correlated noise
+        if isinstance(noise_model, CorrelatedNoise):
+            print(f"Using correlated noise for {noise_model.n_sensors} sensors")
+            # Generate one long continuous trajectory for all sensors
+            extended_times = jnp.arange(0, times[-1] * n_realizations, times[1] - times[0])
+            long_trajectory = noise_model.generate_trajectory(key, extended_times)
+            
+            # Split into segments for different realizations
+            segment_length = len(times)
+            segments = []
+            for i in range(n_realizations):
+                start_idx = i * segment_length
+                end_idx = (i + 1) * segment_length
+                if end_idx <= long_trajectory.shape[1]:  # Check time dimension
+                    segments.append(long_trajectory[:, start_idx:end_idx])
+                else:
+                    # If we don't have enough data, pad with zeros
+                    segment = long_trajectory[:, start_idx:]
+                    padding = jnp.zeros((noise_model.n_sensors, segment_length - segment.shape[1]))
+                    segments.append(jnp.concatenate([segment, padding], axis=1))
+            
+            self.noise_trajectories = jnp.array(segments)
+        else:
+            # Original behavior for single-sensor noise
+            extended_times = jnp.arange(0, times[-1] * n_realizations, times[1] - times[0])
+            long_trajectory = noise_model.generate_trajectory(key, extended_times)
+            
+            # Split into segments for different realizations
+            segment_length = len(times)
+            segments = []
+            for i in range(n_realizations):
+                start_idx = i * segment_length
+                end_idx = (i + 1) * segment_length
+                if end_idx <= len(long_trajectory):
+                    segments.append(long_trajectory[start_idx:end_idx])
+                else:
+                    # If we don't have enough data, pad with zeros
+                    segment = long_trajectory[start_idx:]
+                    padding = jnp.zeros(segment_length - len(segment))
+                    segments.append(jnp.concatenate([segment, padding]))
+            
+            self.noise_trajectories = jnp.array(segments)
         
         print("Noise trajectory segments precomputed successfully.")
     
@@ -251,11 +273,17 @@ class JAXReadoutSimulator:
             charge_state = charge_states[state_idx]
             noise_trajectory = self.noise_trajectories[noise_idx]
             
+            # Handle correlated noise: extract trajectory for this specific sensor
+            if noise_trajectory.ndim > 1:  # Correlated noise case
+                sensor_noise_trajectory = noise_trajectory[sensor_idx]
+            else:  # Single sensor case
+                sensor_noise_trajectory = noise_trajectory
+            
             # Get sensor signal
             # Create a unique key for this realization
             realization_key = jax.random.fold_in(key, noise_idx)
             I, Q, V_refl_t = sensor.get_signal_jax(
-                times, self.dot_system, charge_state, sensor_idx, params, noise_trajectory, realization_key
+                times, self.dot_system, charge_state, sensor_idx, params, sensor_noise_trajectory, realization_key
             )
             
             # Store results
@@ -266,7 +294,7 @@ class JAXReadoutSimulator:
                 'I': I,
                 'Q': Q,
                 'V_refl_t': V_refl_t,
-                'noise_trajectory': noise_trajectory
+                'noise_trajectory': sensor_noise_trajectory
             }
             
             return carry, result

@@ -206,8 +206,97 @@ class OverFNoise:
         return freqs, total_spectrum
 
 
+class CorrelatedNoise:
+    """
+    JAX-compatible correlated noise model for multiple sensors.
+    
+    This class generates correlated noise trajectories for multiple sensors by
+    applying a correlation matrix to independent noise sources.
+    
+    Attributes:
+        base_noise_model: Base noise model (OU_noise or OverFNoise)
+        correlation_matrix: Correlation matrix between sensors
+        n_sensors: Number of sensors
+    """
+    
+    def __init__(self, base_noise_model: Union[OU_noise, OverFNoise], 
+                 correlation_matrix: jax.Array):
+        """
+        Initialize correlated noise model.
+        
+        Args:
+            base_noise_model: Base noise model to use for each sensor
+            correlation_matrix: Correlation matrix of shape (n_sensors, n_sensors)
+                               Should be symmetric and positive semi-definite
+        """
+        self.base_noise_model = base_noise_model
+        self.correlation_matrix = correlation_matrix
+        self.n_sensors = correlation_matrix.shape[0]
+        
+        # Validate correlation matrix
+        if correlation_matrix.shape != (self.n_sensors, self.n_sensors):
+            raise ValueError(f"Correlation matrix must be square with shape ({self.n_sensors}, {self.n_sensors})")
+        
+        # Check if matrix is symmetric
+        if not jnp.allclose(correlation_matrix, correlation_matrix.T):
+            raise ValueError("Correlation matrix must be symmetric")
+        
+        # Check if matrix is positive semi-definite
+        eigenvals = jnp.linalg.eigvals(correlation_matrix)
+        if jnp.any(eigenvals < -1e-10):  # Small tolerance for numerical errors
+            raise ValueError("Correlation matrix must be positive semi-definite")
+        
+        # Compute Cholesky decomposition for efficient sampling
+        self.cholesky_matrix = jnp.linalg.cholesky(correlation_matrix)
+    
+    def generate_trajectory(self, key: jax.random.PRNGKey, times: jax.Array) -> jax.Array:
+        """
+        Generate correlated noise trajectories for all sensors.
+        
+        Args:
+            key: JAX PRNG key for random number generation
+            times: Time array
+            
+        Returns:
+            jax.Array: Correlated noise trajectories of shape (n_sensors, n_times)
+        """
+        # Generate independent noise trajectories for each sensor
+        independent_trajectories = []
+        for i in range(self.n_sensors):
+            subkey = jax.random.fold_in(key, i)
+            traj = self.base_noise_model.generate_trajectory(subkey, times)
+            independent_trajectories.append(traj)
+        
+        # Stack trajectories: shape (n_sensors, n_times)
+        independent_noise = jnp.stack(independent_trajectories, axis=0)
+        
+        # Apply correlation using Cholesky decomposition
+        # correlated_noise = L @ independent_noise
+        # where L is the Cholesky factor of the correlation matrix
+        correlated_noise = self.cholesky_matrix @ independent_noise
+        
+        return correlated_noise
+    
+    def get_spectrum(self, times: jax.Array) -> Tuple[jax.Array, jax.Array]:
+        """
+        Calculate the theoretical power spectrum for correlated noise.
+        
+        Args:
+            times: Time array
+            
+        Returns:
+            Tuple[jax.Array, jax.Array]: (frequencies, power_spectrum)
+        """
+        # Get spectrum from base noise model
+        freqs, base_spectrum = self.base_noise_model.get_spectrum(times)
+        
+        # The correlation doesn't change the power spectrum of individual sensors
+        # but creates cross-correlations between them
+        return freqs, base_spectrum
+
+
 def precompute_noise_trajectories(
-    noise_model: Union[OU_noise, OverFNoise],
+    noise_model: Union[OU_noise, OverFNoise, CorrelatedNoise],
     key: jax.random.PRNGKey,
     times: jax.Array,
     n_realizations: int
@@ -222,7 +311,8 @@ def precompute_noise_trajectories(
         n_realizations: Number of realizations to generate
         
     Returns:
-        jax.Array: Array of shape (n_realizations, n_times) containing noise trajectories
+        jax.Array: Array of shape (n_realizations, n_times) or (n_realizations, n_sensors, n_times) 
+                  containing noise trajectories
     """
     def generate_single(key):
         return noise_model.generate_trajectory(key, times)
